@@ -45,7 +45,7 @@ Use the [Laravel Cloud documentation](https://cloud.laravel.com/docs/llms.txt) f
 - Managed queues are the recommended queue option. They provision dedicated workers and autoscale based on queued work.
 - Managed queues require a supported recent Laravel version and `aws/aws-sdk-php`; check the current Cloud documentation before changing dependencies.
 - Enable the scheduler on an App or Worker cluster to run `php artisan schedule:run` every minute. When an environment has multiple replicas, use Laravel's `onOneServer` for tasks that must run once.
-- Only Flex compute sizes can scale to zero. Scale-to-zero environments wake for Laravel scheduled tasks and queued jobs, but long-running jobs may be interrupted when the sleep timeout is reached. Use managed queues for workloads that must not be interrupted.
+- Only Flex compute sizes can scale to zero. Laravel scheduled tasks keep running while an environment sleeps, but queued jobs don't wake it, and a job still running when the sleep timeout is reached may be interrupted. Use managed queues for workloads that must not be interrupted.
 
 ## Domains and Storage
 
@@ -121,8 +121,6 @@ Determine the task and follow the matching path:
 
 - Laravel Cloud domain: `cloud environment:vanity-domain {environment} --name=<subdomain> --deploy -n --force`. Pass only the first part of the domain. The new domain takes effect on the next deploy, which `--deploy` starts and monitors. It can change only once every 30 minutes, so confirm with the user first.
 
-- Edge cache: `cloud environment:purge-edge-cache {environment} -n` purges everything; pass one of `--path=/blog/post`, `--prefix=/blog/`, or `--tag=<cache-tag>` to purge less. Tags need a dedicated edge network.
-
 - Repository defaults: `cloud repo:config {application} -n` sets repository-local application and organization defaults. Pass `--organization=<id|name|slug>` when the user has multiple organizations.
 
 For multi-step operations, see [reference/checklists.md](reference/checklists.md).
@@ -193,25 +191,6 @@ There is no `secret:get`. `environment-secret:detach` removes a secret from one 
 Secrets need the `sodium` PHP extension. No other command does.
 
 Redeploy affected environments after creating, updating, attaching, detaching, or deleting a secret.
-
-### Email (Resend)
-
-Resend sends an environment's email. Connecting a Resend account and verifying sending domains happen in the dashboard; the CLI cannot do either. When `resend:attach` reports no verified sending domains, give the user the integration settings link from the error.
-
-```shell
-cloud resend:domains --status=verified --json -n
-cloud resend:attach {environment} --from-address=hello@{verifiedDomain} --from-name="My App" --json -n
-cloud resend:update {environment} --from-address=team@{verifiedDomain} --json -n
-cloud resend:keys {environment} --json -n
-cloud resend:detach {environment} --force -n
-```
-
-- The sender address must use a verified sending domain. `--from-name` defaults to the application name.
-- `resend:attach` creates a new sending key. To share one with another environment, pass `--reuse-key-id` with an ID from `resend:keys`.
-- Attaching makes Cloud set `RESEND_API_KEY`, `MAIL_MAILER`, `MAIL_FROM_ADDRESS`, and `MAIL_FROM_NAME`, replacing any the environment already had.
-- The application needs `resend/resend-php`. Under `-n`, `resend:attach` only warns when it is missing; run `composer require resend/resend-php` in the project.
-- Detaching deletes the sending key unless another environment uses it.
-- Redeploy the environment after attaching, updating, or detaching Resend.
 
 ### Email (Resend)
 
